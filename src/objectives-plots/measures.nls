@@ -1,0 +1,138 @@
+
+
+
+;; -------------------------------------------------------------------------
+;; ELITE-LISTNERS
+
+to-report dem_gravity_center
+    let dems turtles with [party = 0]
+    let dem_gc compute_gc_integral dems
+    report dem_gc
+end 
+
+to-report rep_gravity_center
+    let reps turtles with [party = 2]
+    let rep_gc compute_gc_integral reps
+    report rep_gc
+end
+
+to-report prob_distr_subset [turtle_subset]
+    let n_turt count turtle_subset
+    let pol_w_lst []
+
+    ; (1) Compute the frequency of each unique polarization value
+    foreach sort-on [polarization-weight] turtle_subset [
+        t ->
+            let p_val [polarization-weight] of t
+            set pol_w_lst lput p_val pol_w_lst
+    ]
+    
+    ; (2) Calculate the cumulative distribution
+    let cum_distribution []
+
+    set pol_w_lst remove-duplicates pol_w_lst
+
+    foreach sort pol_w_lst [
+        p_val ->
+            let p_freq ( ( count turtle_subset with [polarization-weight = p_val] ) / n_turt )
+            set cum_distribution lput p_freq cum_distribution
+    ]
+
+    report cum_distribution
+end
+
+to-report prob_distr_weighted_subset [turtle_subset]
+    let n_turt count turtle_subset
+    let pol_w_lst []
+
+    ; (1) Compute the frequency of each unique polarization value
+    foreach sort-on [polarization-weight] turtle_subset [
+        t ->
+            let p_val [polarization-weight] of t
+            set pol_w_lst lput p_val pol_w_lst
+    ]
+    
+    ; (2) Calculate the cumulative distribution
+    let cum_distribution_weighted []
+
+    foreach sort pol_w_lst [
+        p_val ->
+            let p_freq ( ( count turtles with [polarization-weight = p_val] ) / n_turt )
+            let this_x (p_freq * p_val)
+            set cum_distribution_weighted lput this_x cum_distribution_weighted
+    ]
+
+    report cum_distribution_weighted
+end
+
+to-report compute_gc_integral [turtle_subset]
+    
+    let pol_prob_distr prob_distr_subset turtle_subset
+    let pol_prob_weighte_distr prob_distr_weighted_subset turtle_subset
+    
+    ; Perform the integration
+    let integra_pol sum pol_prob_distr
+    let integra_pol_weighted sum pol_prob_weighte_distr
+
+    ifelse (integra_pol != 0)[
+        report integra_pol_weighted / integra_pol
+    ][
+        report 0
+    ]
+end
+
+;; -------------------------------------------------------------------------
+;; GENERAL STATS
+
+to-report distribution_party
+    let n_dem count (turtles with [party = 0])
+    let n_wav count (turtles with [party = 0])
+    let n_rep count (turtles with [party = 0])
+
+    report (list n_dem n_wav n_rep)
+end
+
+
+to-report compute-distance [turtle_set]
+    let tot_sq_diff 0
+
+    foreach sort turtles [
+        t ->
+            let my_pol_w [polarization-weight] of t
+            let my_neighs [link-neighbors] of t
+            let num_neighs count my_neighs
+
+            let my_dist 0
+            foreach sort my_neighs [
+                _n ->
+                    let n_pol_w [polarization-weight] of _n
+                    let this_dist ( abs( my_pol_w - n_pol_w ) ^ 2 )
+                    set my_dist ( my_dist + this_dist )
+            ]
+
+            set tot_sq_diff ( tot_sq_diff + ( my_dist / num_neighs ) )
+    ]
+
+    report sqrt tot_sq_diff
+
+end
+;; -------------------------------------------------------------------------
+;; HELPER Fs
+
+
+to setup_hist_party
+  ;; clear previous plots
+  plot-pen-reset
+  let min_x -1
+  let max_x 1
+  set-plot-x-range min_x max_x
+end
+
+to setup_hist_gc
+  ;; clear previous plots
+  plot-pen-reset
+  let min_x -1
+  let max_x 1
+  set-plot-x-range min_x max_x
+end
+

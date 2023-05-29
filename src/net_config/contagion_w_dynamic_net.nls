@@ -1,0 +1,157 @@
+
+
+
+;; -------------------------------------------------------------------------
+;; NETWORK POPULATION
+;; We start with a evenly distributed network where links are made so that
+;; they are balanced and they meet the given constraints on the maximum number
+;; of friends.
+
+
+
+to model_network_infection_dynamic  
+  let num_nodes count turtles
+  
+  ifelse (num_nodes = 0)[
+    setup-nodes
+    
+    ;; add links
+    setup-spatially-clustered-network
+
+    ;; set initial infections
+    ask turtles [ 
+      ;; setup timer and allow polarization effects
+      become-susceptible
+      let pol_w polarization-weight
+
+      ifelse (pol_w < (- wavering_weight)) [
+          ;; democrats
+          set party 0
+      ][
+          ifelse (pol_w > wavering_weight) [
+              ;; republican
+              set party 2
+          ][
+              ;; wavering
+              set party 1
+          ]
+      ]
+      set color (item party party-colors)
+    ]
+  ][
+    ;; create new turtles
+    let turt_to_create (N - count turtles)
+    create-turtles turt_to_create [
+      set shape "person"
+      ; for visual reasons, we don't put any nodes *too* close to the edges
+      setxy (random-xcor * 0.95) (random-ycor * 0.95)
+      become-susceptible
+
+      ;; initialize polariation weight
+      let pol_w ( (random-float 2) - 1 )
+      set polarization-weight pol_w
+      ifelse (pol_w < (- wavering_weight)) [
+            ;; democrats
+            set party 0
+        ][
+            ifelse (pol_w > wavering_weight) [
+                ;; republican
+                set party 2
+            ][
+                ;; wavering
+                set party 1
+            ]
+        ]
+      set color (item party party-colors)
+
+      ;; initial timer set randomly with maximum bound given by the user-defined param "virus-check-frequency"
+      set virus-check-timer random virus-check-frequency 
+    ]
+    ;; add links
+    setup-spatially-clustered-network
+  ]
+end
+
+
+
+;; -------------------------------------------------------------------------
+;; NETWORK EVOLUTION
+
+to evolve_infection_dynamic
+  ;; (1) Infection spread
+  go_infection
+
+  ;; (2) Evolution of links - influenced by the individuals being corrupted
+  ;; most likely to have a drop of link from an infected node 
+
+  ;; (2-1) always choose the node with lower polarization weight so as to test whether
+  ;; its wavering behaviour could actually be conditioned by polarized nodes
+  let chosen_node draw_chosen_node
+  let starting_pol_w [polarization-weight] of chosen_node
+
+  ;; (2-2) REMOVE OLD INTERACTIONS
+  ;; remove links with the node having the most different opinion
+  ;; old friends may have very different views after a few rounds of evolution
+  let link2drop draw_link2drop_opp_opinion chosen_node
+  
+  if (link2drop != nobody)[
+    ask link2drop [
+      let resistence_weight link_resistance
+      if (random-float 1 > resistence_weight) [
+        die ;; remove connection
+      ]
+    ]
+  ]
+
+  ;; (2-3) NEW INTERACTION
+  ;; add a new link accounting for the political party and difference of opinion
+  ;; toss a coin to decide whether to impose a new relationship
+  if ([count link-neighbors] of chosen_node < max_number_of_connections) and (random-float 1 >= 0.5) [
+    ask chosen_node [
+      ;; draw a link with a popular node having the same political view
+      let new_intereation draw_new_interaction chosen_node
+      
+      if (new_intereation != nobody and new_intereation != chosen_node) [ 
+        create_link new_intereation
+      ]
+    ]
+  ]
+
+  ;; (2-4) EFFECT OF INTERACTION: CHANGE IN THE POLARIZATION WEIGHT
+  ;; draw a random node that is either a neighbouring node or a second-degree neighbor
+  let communicating_node draw-communicating-node chosen_node
+  
+  if (communicating_node != nobody)[
+    let dest_pol_w [polarization-weight] of communicating_node
+  
+    if (random-float 1 > 0.5)
+    [
+      ;; change source node polarization weight
+      let new_weight (dest_pol_w + starting_pol_w) / 2
+      ask chosen_node [
+        set polarization-weight new_weight
+      ]
+
+      ;; if user.party = wavering (party = 1) --> choose a party if polarization index has
+      ;; has overcame a threshold
+      ask chosen_node [
+          ;; eventually change party
+          ifelse ( abs(new_weight) > wavering_weight ) [
+              ifelse (new_weight < 0) [
+                  ; become democrat
+                  set party 0
+              ][
+                  ; become republican
+                  set party 2
+              ]
+          ][
+              set party 1
+          ]        
+          set color (item party party-colors)
+          become-resistant
+        ]
+    ]
+  ]
+end
+
+

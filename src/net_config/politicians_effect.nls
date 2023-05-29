@@ -1,0 +1,179 @@
+;; THE NETWORK IS DIVIDED IN CLUSTERS BUT WITH LOW OPINION DISTANCE
+;; THE ONLY NODES INFECTED ARE POLITICIANS
+
+
+;; use elite and listener roles, the former being the only one that can spread their view
+;; and the latter the ones whose polarization weight can changes. The political view, net
+;; of the wavering individuals, remain fixed. They would introduce too much instability
+;; in the model that would bring unreliable and unrealistic results
+
+;; Use Barabasi-Albert network to build an enviroments where popularity/public relevance
+;; are key to form connections.
+
+;; Once the network has been built, assign politicians (elite) an high polarization weight
+;; - say sign(.) rand(0.8, 1) - and accordingly populate their neighbours with low pol_weigh
+;; but similar sign
+
+;; Once the network has been created, users cannot build new connections
+
+
+to model_network_roles
+    let n_listeners (ceiling (N * (1 - elite_percentage)))
+    let anc average_number_of_connections
+    let eps (floor (anc / N))
+
+    ;; create node
+    create-turtles n_listeners [
+        set shape "person"
+        become-susceptible
+
+        ;; draw random elite node to attach to
+        let elite_partner min-one-of turtles with [role = 1] [count link-neighbors]
+        create_link elite_partner
+
+        ;; listeners are wavering but still they have a tendency
+        ;; towards a particular party
+        set polarization-weight ( (random-float (2 * wavering_weight)) - wavering_weight )
+        set party 1 ; wavering
+        set color (item party listener-colors)
+
+        ;; find nodes to link to 
+        let connection_set []
+        ifelse ( cross_following? ) [
+            set connection_set other turtles with [(not link-neighbor? myself) 
+                                                    and
+                                                   (count link-neighbors < max_number_of_connections)]
+        ][
+            ;; don't follow other elite nodes
+            set connection_set other turtles with [(role = 0) 
+                                                   and
+                                                   (not link-neighbor? myself)
+                                                   and
+                                                   (count link-neighbors < max_number_of_connections)
+                                                ]
+        ]
+        
+        let n_links min (list
+                        floor ((random-float (2 * eps)) - eps +  anc )
+                        max_number_of_connections
+        )
+
+        ;; sample randomly some connections to made
+        ;; regardless of the party they support 
+        repeat n_links [
+            let new_partner one-of connection_set with [not link-neighbor? myself]
+            if ((new_partner != nobody) and (count link-neighbors < max_number_of_connections))[
+                create_link new_partner
+            ]
+        ]
+    ]
+
+    setup-spatially-clustered-network
+end
+
+to setup_elite_nodes
+    ;; define ALL elite nodes based on (elite_percentage, elite_polarization)
+
+    ;; elite nodes must not be (directly) connected between each other
+    let n_elite_nodes floor (N * elite_percentage)
+    let pol_distribution elite_polarization
+    let elite_pol (1 - wavering_weight)
+
+    ;; create elite without any connections
+    create-turtles n_elite_nodes [
+        set shape "person"
+        let my_party -1
+        ifelse (random-float 1 > pol_distribution) [
+            set my_party 0
+        ][
+            set my_party 2
+        ]
+        
+        let my_pol_w ((random-float wavering_weight) + elite_pol)
+        
+        ; set sign according to the user's party
+        if (my_party = 0) [
+            set my_pol_w ( - my_pol_w )
+        ]
+
+        ; assign party and polarization weight
+        set role 1
+        set party my_party
+        set color (item party elite-colors)
+        set polarization-weight my_pol_w
+        become-susceptible
+    ]
+end
+
+to evolve_listeners
+    ;; (1) Infection spread
+    go_infection
+
+    ;; (2) choose a node
+    let chosen_node draw_chosen_node_listners
+
+    ;; (2-2) REMOVE OLD INTERACTIONS
+    let link2drop draw_link2drop_listeners chosen_node
+    
+    if (link2drop != nobody)[
+        ask link2drop [
+        let resistence_weight link_resistance
+        if (random-float 1 > resistence_weight) [
+            die ;; remove connection
+        ]
+        ]
+    ]
+
+    ;; (2-3) NEW INTERACTION
+    if ([count link-neighbors] of chosen_node < max_number_of_connections) and (random-float 1 >= 0.5) [
+        ask chosen_node [
+        ;; draw a link with a popular node having the same political view
+        let new_intereation nobody
+        ifelse (cross_following?) [
+            set new_intereation draw_new_interaction chosen_node
+        ][
+            set new_intereation draw_new_interaction_listeners_only chosen_node
+        ]
+        
+        if (new_intereation != nobody and new_intereation != chosen_node) [ 
+            create_link new_intereation
+        ]
+        ]
+    ]
+
+
+
+    ;; (3) effect of elite on polariation weight
+    if (chosen_node != nobody)[
+        let my_elite_neighbors turtles with [ (link-neighbor? chosen_node) and (role = 1) ]
+        let in_degree (count my_elite_neighbors)
+        let curr_pol_w [polarization-weight] of chosen_node
+        
+        ;; (3-1) update polarization weight
+        let neigh_pol_w ( sum [polarization-weight] of my_elite_neighbors) / in_degree
+        let new_pol_w ((neigh_pol_w + curr_pol_w) / 2)
+
+        ;; (3-2) consolidte party position if it is the case
+        ask chosen_node [
+            ;; eventually change party
+            ifelse ( abs(new_pol_w) > wavering_weight ) [
+                ifelse (new_pol_w < 0) [
+                    ; become democrat
+                    set party 0
+                ][
+                    ; become republican
+                    set party 2
+                ]
+            ][
+                set party 1
+            ]        
+            set color (item party listener-colors)
+            set polarization-weight new_pol_w
+            become-resistant
+        ]
+
+
+    ]
+end
+
+

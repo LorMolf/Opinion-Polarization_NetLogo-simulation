@@ -1,0 +1,108 @@
+
+
+;; MAIN PROGRAM
+__includes[
+  "src/utils/turtle_struct.nls"
+  "src/objectives-plots/plots.nls"
+  "src/objectives-plots/net_stats.nls"
+  "src/net_config/contagion_w_static_net.nls"
+  "src/net_config/contagion_w_dynamic_net.nls"
+  "src/net_config/politicians_effect.nls"
+  "src/utils/handler_fs.nls"
+  "src/utils/infection_utils.nls"
+]
+
+;; [GLOBAL VARs]
+
+;; N : max number of individuals
+;; plot? : plot values
+;; layout? : animate the layout while turtles are created
+;; net_type : Contagion-Stable, Contagion-Dynamic, User-Roles
+;; average_number_of_connections
+;; elite_percentage
+;; elite_polarization
+;; cross-following?   ;; whether listeners people can interact with elite of the opposing party
+;; expressed_internal_opinions? ;; whether individuals have different opinions
+;; wavering_weight ;; thershold over which a turtle is considered to be polarized and therefore take a party
+
+globals [
+  setup_role_done? ;; whether elite nodes have been already created
+]
+
+to setup
+  clear-all
+  set setup_role_done? false
+  set-default-shape turtles "person"
+  
+  ;; set up global vars
+  setup_turtle_structs
+
+  reset-ticks
+end
+
+
+
+to go
+  let curr_num_nodes count turtles
+  
+
+  ifelse (curr_num_nodes < N)
+  [
+    ;; [BUILD THE NET]
+    ;; handle the net population according to the chosen model
+    make-node
+  ]
+  [     
+    ;; [MODEL INTERACTIONS]
+    ;; handle the net interactions: new link and dropping link
+    ifelse (net_type = "User-Roles")[
+     evolve_listeners
+    ]
+    [ 
+      ifelse (net_type = "Contagion-Static") [
+        evolve_infection_static
+      ][
+        ;; Contagion-Dynamic
+        evolve_infection_dynamic
+      ] 
+    ]
+    
+    ;; kill nodes with no connections
+    handle_isolation
+  ]
+  
+  tick
+  if layout? [ 
+    layout 
+  ]
+end
+
+
+to handle_isolation
+  ask turtles with [(count link-neighbors) = 0] [die]
+  ;while [count turtles < N] [
+  ;  add_new_node
+  ;]
+end
+
+
+;; create a new individual according to the chosen model
+to make-node
+  ifelse (net_type = "User-Roles") [
+      if (not setup_role_done?) [
+        ; define elite nodes
+        setup_elite_nodes
+
+        set setup_role_done? true
+      ]
+      ; add listeners
+      model_network_roles
+  ][
+    ; contagion models - form evenly clusterd network
+    ifelse (net_type = "Contagion-Static") [
+      model_network_infection_static
+    ][
+      model_network_infection_dynamic
+    ]
+  ]
+end

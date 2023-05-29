@@ -1,0 +1,91 @@
+
+
+;; CONTAGION WITH STATIC NETWORK
+
+;; -------------------------------------------------------------------------
+;; NETWORK POPULATION
+
+
+to model_network_infection_static 
+  setup-nodes
+  if (count turtles = N)[
+    ;; add links
+    setup-spatially-clustered-network
+
+    ;; set initial polarization features
+    ask turtles [ 
+        ;; setup timer and allow polarization effects
+        become-susceptible
+        let pol_w polarization-weight
+        
+        ;; assign party and polarization weights
+        ifelse (pol_w < (- wavering_weight)) [
+            ;; democrats
+            set party 0
+        ][
+            ifelse (pol_w > wavering_weight) [
+                ;; republican
+                set party 2
+            ][
+                ;; wavering
+                set party 1
+            ]
+        ]
+        set color (item party party-colors)        
+        ]
+  ]
+end
+
+
+;; -------------------------------------------------------------------------
+;; NETWORK EVOLUTION
+
+to evolve_infection_static
+  ;; (1) Infection spread
+  go_infection
+
+  ;; (2) Evolution of links - influenced by the individuals being corrupted
+  ;; most likely to have a drop of link from an infected node 
+
+  ;; (2-1) always choose the node with lower polarization weight so as to test whether
+  ;; its wavering behaviour could actually be conditioned by polarized nodes
+  let chosen_node draw_chosen_node
+  let starting_pol_w [polarization-weight] of chosen_node
+
+
+  ;; (2-2) EFFECT OF INTERACTION: CHANGE IN THE POLARIZATION WEIGHT
+  ;; draw a random node that is either a neighbouring node or a second-degree neighbor
+  let communicating_node draw-communicating-node chosen_node
+  let dest_pol_w [polarization-weight] of communicating_node
+  
+  if (random-float 1 > 0.5)
+  [
+    ;; change source node polarization weight
+    let new_weight (dest_pol_w + starting_pol_w) / 2
+    ask chosen_node [
+      set polarization-weight new_weight
+    ]
+
+    ;; if user.party = wavering (party = 1)
+    ;; --> choose a party if polarization index has overcame a threshold
+    ;; (become democrat or republican according to the polarization sign)
+    ask chosen_node [
+          ;; eventually change party
+          ifelse ( abs(new_weight) > wavering_weight ) [
+              ifelse (new_weight < 0) [
+                  ; become democrat
+                  set party 0
+              ][
+                  ; become republican
+                  set party 2
+              ]
+          ][
+              set party 1
+          ]        
+          set color (item party party-colors)
+          become-resistant
+        ]
+  ]
+end
+
+

@@ -1,0 +1,185 @@
+
+
+__includes["src/objectives-plots/measures.nls"]
+
+;; -------------------------------------------------------------------------
+;; HISTOGRAMS
+
+to hist_gravity_center [party_subset]
+    if not plot? [ stop ]
+    let p_distr prob_distr_weighted_subset party_subset
+
+    histogram p_distr
+end
+
+to-report repeat-value [val n_times]
+  let lst []
+  repeat n_times [
+    set lst lput val lst
+  ]
+  report lst
+end
+
+to hist_gc [subset pen_color]
+    let gc_val compute_gc_integral subset ;; x-coord of gravity center
+    let val ifelse-value (([party] of one-of subset) = 0) [-1] [1]
+    let freq_list repeat-value val gc_val
+  
+    print(gc_val)
+    print(val)
+    print(freq_list)
+    set-plot-pen-color pen_color
+    histogram freq_list
+end
+
+
+to hist_party_weights [turtle_subset]
+    ;; histogram of polarization weights for each party
+    let party_w [polarization-weight] of turtle_subset
+    histogram party_w
+end
+
+
+to evolution_polarization_stats
+    ; opinion_polarization, disagreement, pol_index
+
+    let op opinion_polarization
+    let mu polarization_index
+    let dis -1
+  
+    ifelse (net_type = "User-Roles") [
+        set dis disagreement_listeners
+    ][
+        set dis disagreement
+    ]
+
+    ;; on tick plot
+    set-plot-pen-color yellow
+    plot op
+
+    set-plot-pen-color orange
+    plot mu
+
+    set-plot-pen-color green
+    plot dis
+end
+
+
+to-report get_disagreement
+    let dis -1
+  
+    ifelse (net_type = "User-Roles") [
+        set dis disagreement_listeners
+    ][
+        set dis disagreement
+    ]
+
+    report dis
+end
+
+to cumulative_distr_gc [turtle_subset pen_color]
+    let cum_distr prob_distr_subset turtle_subset
+    ;; get also the sort X
+    let ids 0
+
+    set-plot-pen-color pen_color
+    plot-pen-down
+    foreach sort-on [polarization-weight] turtle_subset [
+        t ->
+            let x_coord [polarization-weight] of t
+            let y_coord item ids cum_distr
+
+            set ids (ids + 1)
+            plotxy x_coord y_coord
+    ]
+    plot-pen-up
+end
+
+to-report format_hist [val]
+    let data precision val 2
+    report data * 10
+end
+
+to cumulative_distr_gc_hist [turtle_subset pen_color]
+    ;; compute frequencies without removing duplicates
+    let n_turt count turtle_subset
+    let pol_w_lst []
+
+    ; Compute the frequency of each unique polarization value
+    foreach sort-on [polarization-weight] turtle_subset [
+        t ->
+            let p_val [polarization-weight] of t
+            set pol_w_lst lput p_val pol_w_lst
+    ]
+
+    set pol_w_lst map format_hist pol_w_lst
+    set-plot-pen-color pen_color
+    histogram pol_w_lst
+end
+
+
+;; -------------------------------------------------------------------------
+;; STATs
+
+to-report gravity_center_dist 
+    let dem_gc dem_gravity_center
+    let rep_gc rep_gravity_center
+    let gc_dist abs(rep_gc - dem_gc)
+
+    ;let max_pol max [polarization-weight] of turtles # 1
+    ;let min_pol min [polarization-weight] of turtles # -1
+
+    report gc_dist / 2
+end
+
+to-report polarization_index
+    let dems turtles with [party = 0]
+    let reps turtles with [party = 2]
+    
+    let dem_p_distr -1
+    ifelse (count dems > 0) [
+        set dem_p_distr (sum (prob_distr_subset dems))
+    ][
+        set dem_p_distr 0
+    ]
+
+    let rep_p_distr -1
+    ifelse (count dems > 0) [
+        set rep_p_distr (sum (prob_distr_subset reps))
+    ][
+        set rep_p_distr 0
+    ]
+
+    let delta_distr abs(rep_p_distr - dem_p_distr)
+    let gc_dist gravity_center_dist
+    
+    let mu -1
+    ifelse (gc_dist > 0) [
+        set mu ( (1 - delta_distr) * gc_dist )
+    ][
+        set mu 0
+    ]
+    report mu
+end
+
+
+to-report opinion_polarization
+    ;; polarization = variance of the expressed opinions
+    let expressed_opinions_w [polarization-weight] of turtles
+    ifelse ((count turtles) > 2)[
+        report variance expressed_opinions_w
+    ][
+        report 0
+    ]
+end
+
+to-report disagreement
+    ;; total squared distance of expressed opinions summed over all edges in the network
+    report compute-distance turtles
+end
+
+to-report disagreement_listeners
+    ;; compute disagreement of listeners users only
+    let turtle_listeners turtles with [role = 0]
+    report  compute-distance turtle_listeners
+end

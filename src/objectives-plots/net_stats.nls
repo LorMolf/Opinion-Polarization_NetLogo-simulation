@@ -1,0 +1,52 @@
+
+extensions [ nw ]
+
+;; http://ccl.northwestern.edu/netlogo/docs/nw.html#nw:distance-to
+
+
+;; MEASURES 2 WATCH
+;; - diameter: length of the longest path between two nodes (the higher the less the net is connected)
+;; - clusterging coeff.: measures how unevenly distributed is the net (low values for unevenly paired nets) (highly clustered if fully connected)
+;; - eigenvector centr.: measures the influence of a node in a net (the higher the more a node in central)
+
+;; an high avg_diameter shows a net not centralized with different long branches
+;; an high clustering coeff. may be a synmpthom of an healty net
+;; low max eigenvector centr. should corresponds to a high clust
+;; an avg_eig_centr that decreases shows a network that is becoming fully connected
+
+
+
+to-report avg_clustering_coeff
+    ifelse (count turtles > 2)[
+        report mean [ nw:clustering-coefficient ] of turtles
+    ][
+        report 1   
+    ]
+end
+
+to-report avg_diameter
+    let diam nw:mean-path-length
+
+    ifelse (diam = false)[
+        ;; two separate clusters if diam == false
+        report -1
+    ][
+        report diam
+    ]
+end
+
+to-report avg_eig_centrality
+    ifelse (count turtles > 0)[ 
+        report mean [ nw:eigenvector-centrality ] of turtles
+    ][
+        report 0
+    ]
+end
+
+to-report max_eig_centrality
+    ifelse (count turtles > 0)[
+        report max [ nw:eigenvector-centrality ] of turtles
+    ][
+        report 0
+    ]
+end

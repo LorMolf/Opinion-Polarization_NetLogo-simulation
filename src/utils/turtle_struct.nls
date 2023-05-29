@@ -1,0 +1,49 @@
+
+
+;; Defines the variables belonging to each turtle. 
+turtles-own
+[
+  resistant?            ;; if true, the turtle can't be infected
+  cooperative?
+  infected              ;; [0 - 1] == (resistant - subsceptible) 
+  party                 ;; [0 - 1 - 2] == [democrat - wavering - republican]
+  virus-check-timer     ;; number of ticks since this turtle's last virus-check
+  polarization-weight   ;; \in [-1,1]
+  internal_polarization-weight
+  fitness-score
+  role                  ;; [0,1] == [listener, elite] 
+  ;; whether the turtle has alraady been partnered in the evolution of the game theory formulation
+  drop_partnered?
+  meet_partnered?
+  partner2drop
+  partner2meet
+]
+
+;; Customize the link fields
+links-own
+[
+  cluster-noise-factor  ;; depends on the type of cluster the link belongs to ~ type of interaction between the considered nodes
+]
+
+;; -------------------------------------------------------------------------
+
+globals [
+    listener-colors
+    elite-colors
+    party-colors
+]
+
+to setup_turtle_structs  
+  ;; role colors
+  set elite-colors [blue grey red]
+  set listener-colors [sky grey pink]
+
+  ;; {blue grey red} for {democrat, wavering, republican}
+  set party-colors [blue gray red] 
+end
+
+
+
+
+
+

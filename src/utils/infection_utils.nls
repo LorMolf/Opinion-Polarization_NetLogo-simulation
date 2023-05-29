@@ -1,0 +1,142 @@
+;; ------------------------------------------------------------------------------------------------------------------------
+;; INFECTION UTILS
+
+; Infection handling
+to go_infection
+  ;;if all? turtles [infected = 0] ;; no individuals are infected - stop since the "desease" cannot spread
+  ;;  [ stop ]
+  ask turtles
+  [
+     set virus-check-timer virus-check-timer + 1
+     if virus-check-timer >= virus-check-frequency
+       [ set virus-check-timer 0 ]
+  ]
+  do-virus-checks
+end
+
+to do-virus-checks
+  ask turtles with [virus-check-timer = 0]
+  [
+    if (resistant?) [
+      become-susceptible
+      set virus-check-timer random virus-check-frequency
+    ]
+  ]
+end
+
+to become-susceptible  ;; turtle procedure
+  let infection-id 1
+  set infected infection-id
+  set resistant? false
+end
+
+to become-resistant  ;; turtle procedure
+  let infection-id 0
+  set infected infection-id
+  set resistant? true
+end
+
+
+;; --------------------------------------------------------------------------------------
+;; NETWORK UTILS
+
+to add_new_node
+  ;; if a node is dropped due to it being left alone after some links drop
+  ;; a new node is added, differently from the setup procedure which employed
+  ;; a random samplin, using preferential attachment
+
+  let dest_node find-partner
+  if dest_node != nobody [
+    create-turtles 1
+    [
+      set shape "person"
+      setxy (random-xcor * 0.95) (random-ycor * 0.95)
+      create_link dest_node
+      
+      ;; assign infection status
+      become-susceptible
+      
+      ;; initial timer set randomly with maximum bound given by the user-defined param "virus-check-frequency"
+      set virus-check-timer random virus-check-frequency 
+    ]
+  ]  
+end
+
+
+to setup-nodes
+  create-turtles N
+  [
+    set shape "person"
+    ; for visual reasons, we don't put any nodes *too* close to the edges
+    setxy (random-xcor * 0.95) (random-ycor * 0.95)
+
+    ;; initialize polariation weight
+    let pol_w ( (random-float 2) - 1 )
+    set polarization-weight pol_w
+
+    ;; initial timer set randomly with maximum bound given by the user-defined param "virus-check-frequency"
+    set virus-check-timer random virus-check-frequency 
+  ]
+end
+
+to setup-spatially-clustered-network_old
+  let num-links (average_number_of_connections * N) / 2
+  while [count links < num-links ]
+  [
+    ask one-of turtles with [count link-neighbors <= max_number_of_connections]
+    [
+      let choice (min-one-of (other turtles with [not link-neighbor? myself and count link-neighbors <= max_number_of_connections])
+                   [distance myself])
+      if choice != nobody [ 
+        create-link-with choice
+      ]
+    ]
+  ]
+
+  ;; set further apart nodes not link between each other 
+  ;repeat 10
+  ;[
+   ; layout-spring turtles links 10 500 200;(world-width / (sqrt N)) 10
+  ;repeat 30 [ layout-spring turtles links 0.2 5 1 ]]
+  repeat 30 [ layout-spring turtles links 0.2 5 1 ]
+end
+
+to setup-spatially-clustered-network
+    let anc average_number_of_connections
+    let eps (floor (anc / N))
+    let num-links (anc * N) / 2
+
+    while [count links < num-links ]
+    [
+        ask min-one-of turtles with [count link-neighbors <= max_number_of_connections] [count link-neighbors]
+        [
+            let my_pol_weight polarization-weight
+            let choice (min-one-of (other turtles with [not link-neighbor? myself and count link-neighbors <= anc])
+                        [abs(my_pol_weight - polarization-weight)])
+            if choice != nobody [ 
+                create-link-with choice
+            ]
+        ]
+    ]
+
+    let alone_t turtles with [count link-neighbors = 0]
+    foreach sort alone_t [
+        t ->
+            let n_links floor ((random-float (2 * eps)) - eps +  anc )
+            repeat n_links [
+                ask t [
+                    let my_pol_weight polarization-weight
+                    let choice (min-one-of (other turtles with [not link-neighbor? myself and count link-neighbors <= anc])
+                   [abs(my_pol_weight - polarization-weight)])
+                    if choice != nobody [ 
+                        create-link-with choice
+                    ]
+                ]
+            ]
+
+    ]
+    ;; set further apart nodes not link between each other
+    if (layout?)[ 
+      repeat 5 [layout-spring turtles links 0.2 (world-width / (sqrt N)) 10]
+    ]
+end
