@@ -1,7 +1,8 @@
 # Opinion Polarization - NetLogo simulation
 This is a NetLogo simulation of different social environment scenarios that can exhibit opinion polarization dynamics. 
 
-![Alt text](img/polarized_net_sketch.jpg?raw=true "Logo")
+<img src="img/polarized_net_sketch.jpg" alt="Logo" width="300">
+
 
 Based on the theoretical assumptions described in the "Opinion Polarization" article, this program makes available a set of tools
 to simulate the behaviour of a social network from the point of view of how connections are made and how a mediating system like
